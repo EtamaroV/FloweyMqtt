@@ -22,10 +22,10 @@ void FloweyMqtt::begin(const char* token) {
     _jwt = "";
   }
 
-  _commandTopic = String("flowey/") + _uuid + "/command";
-  _sensorTopic  = String("flowey/") + _uuid + "/sensors";
-  _notifyTopic  = String("flowey/") + _uuid + "/notify";
-  _statusTopic  = String("flowey/") + _uuid + "/status";
+  _commandTopic = String("/flowey/") + _uuid + "/command";
+  _sensorTopic  = String("/flowey/") + _uuid + "/sensors";
+  _notifyTopic  = String("/flowey/") + _uuid + "/notify";
+  _statusTopic  = String("/flowey/") + _uuid + "/status";
 
   _client.setCallback(FloweyMqtt::callback);
 }
