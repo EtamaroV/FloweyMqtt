@@ -4,6 +4,9 @@ FloweyMqtt* FloweyMqtt::_instance = nullptr;
 
 FloweyMqtt::FloweyMqtt(Client& client) {
   _client.setClient(client);
+  
+  _client.setBufferSize(1024); 
+
   _client.setServer(FLOWEY_MQTT_SERVER, FLOWEY_MQTT_PORT);
   _instance = this;
   _commandCallback = nullptr;
