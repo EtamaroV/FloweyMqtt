@@ -40,6 +40,8 @@ void setup() {
   
   // Register Callbacks
   flowey.setSensorRequestCallback(onSensorRequest); // รับคำขอค่า Sensor
+
+  flowey.setDataCallback(onDataReceived);
   
   flowey.sendNotification("Flowey Device Started!");
 }
