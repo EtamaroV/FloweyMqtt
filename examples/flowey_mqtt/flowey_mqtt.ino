@@ -8,6 +8,16 @@ const char* DEVICE_TOKEN = "TOKEN";
 WiFiClient espClient;
 FloweyMqtt flowey(espClient);
 
+void onDataReceived(FloweyPlantData data) {
+  Serial.println("--- Received Plant Data ---");
+  Serial.println("Nickname: " + data.plantNickname);
+  Serial.println("User: " + data.userNickname);
+  Serial.println("Species: " + data.species);
+  Serial.println("Birth: " + data.birth);
+  
+  // Save to Preferences/EEPROM here...
+}
+
 void onSensorRequest() {
   Serial.println("Server requested sensor data!");
   

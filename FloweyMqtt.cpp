@@ -5,12 +5,15 @@ FloweyMqtt* FloweyMqtt::_instance = nullptr;
 FloweyMqtt::FloweyMqtt(Client& client) {
   _client.setClient(client);
   
+  // เพิ่มขนาด Buffer ถ้า JSON มีขนาดใหญ่ (1024 น่าจะพอสำหรับข้อมูลชุดนี้)
   _client.setBufferSize(1024); 
 
   _client.setServer(FLOWEY_MQTT_SERVER, FLOWEY_MQTT_PORT);
   _instance = this;
+  
   _commandCallback = nullptr;
   _sensorRequestCallback = nullptr;
+  _dataCallback = nullptr; // init เป็น null
 }
 
 void FloweyMqtt::begin(const char* token) {
@@ -29,6 +32,7 @@ void FloweyMqtt::begin(const char* token) {
   _sensorTopic  = String("/flowey/") + _uuid + "/sensors";
   _notifyTopic  = String("/flowey/") + _uuid + "/notify";
   _statusTopic  = String("/flowey/") + _uuid + "/status";
+  _dataTopic    = String("/flowey/") + _uuid + "/data";
 
   _client.setCallback(FloweyMqtt::callback);
 }
@@ -39,19 +43,17 @@ void FloweyMqtt::callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-// *** หัวใจสำคัญอยู่ที่นี่ ***
 void FloweyMqtt::handleMessage(char* topic, byte* payload, unsigned int length) {
   String message = "";
   for (unsigned int i = 0; i < length; i++) {
     message += (char)payload[i];
   }
 
+  // --- Handle Command ---
   if (String(topic) == _commandTopic) {
-    
     if (message == "PING") {
       _client.publish(_statusTopic.c_str(), "PONG");
     }
-
     else if (message == "GET_SENSORS") {
       if (_sensorRequestCallback) {
         _sensorRequestCallback(); 
@@ -61,6 +63,29 @@ void FloweyMqtt::handleMessage(char* topic, byte* payload, unsigned int length) 
       if (_commandCallback) {
         _commandCallback(message);
       }
+    }
+  }
+
+  // --- Handle Data (JSON) ---
+  if (String(topic) == _dataTopic) {
+    // ใช้ JsonDocument (ArduinoJson v7) หรือ StaticJsonDocument (v6)
+    JsonDocument doc; 
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (!error) {
+      FloweyPlantData data;
+      // ดึงค่าใส่ Struct (ใช้ .as<String>() เพื่อความปลอดภัย)
+      data.plantNickname = doc["plantNickname"].as<String>();
+      data.userNickname  = doc["userNickname"].as<String>();
+      data.species       = doc["species"].as<String>();
+      data.birth         = doc["birth"].as<String>();
+
+      // ส่งต่อไปที่ Main Sketch
+      if (_dataCallback) {
+        _dataCallback(data);
+      }
+    } else {
+      // Serial.print("JSON Failed: "); Serial.println(error.c_str());
     }
   }
 }
@@ -73,6 +98,11 @@ void FloweyMqtt::setSensorRequestCallback(FloweySensorRequestCallback callback) 
   _sensorRequestCallback = callback;
 }
 
+// ฟังก์ชัน Setter ใหม่
+void FloweyMqtt::setDataCallback(FloweyDataCallback callback) {
+  _dataCallback = callback;
+}
+
 void FloweyMqtt::loop() {
   if (!_client.connected()) {
     reconnect();
@@ -83,9 +113,14 @@ void FloweyMqtt::loop() {
 void FloweyMqtt::reconnect() {
   while (!_client.connected()) {
     String clientId = "flowey-" + _uuid;
+    // เชื่อมต่อด้วย JWT ถ้ามี
     if (_client.connect(clientId.c_str(), _uuid.c_str(), _jwt.c_str())) {
+      
       _client.subscribe(_commandTopic.c_str());
       
+      // *** สำคัญ: ต้อง Subscribe data topic ด้วย ***
+      _client.subscribe(_dataTopic.c_str());
+
       _client.publish(_statusTopic.c_str(), "ONLINE");
     } else {
       delay(5000);
